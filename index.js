@@ -2,11 +2,9 @@ import http from "http";
 import path from "path";
 import fs from "fs";
 import { Server } from "socket.io";
-import {getMessages, addMessage} from "./database.js"; 
+import { getMessages, addMessage, isExistUser, addUser, getAuthToken } from "./database.js";
 
-await addMessage("hello", 1)
-let m = await getMessages()
-console.log(m)
+const validTokens = [];
 
 const __dirname = path.resolve();
 
@@ -22,6 +20,8 @@ let pathToRegister = path.join(__dirname, "static", "register.html");
 let registerHtmlFile = fs.readFileSync(pathToRegister);
 let pathToAuthScript = path.join(__dirname, "static", "auth.js");
 let authScript = fs.readFileSync(pathToAuthScript);
+let pathToLoginHtml = path.join(__dirname, "static", "login.html");
+let loginHtml = fs.readFileSync(pathToLoginHtml);
 
 let server = http.createServer((req, res) => {
     try {
@@ -45,6 +45,12 @@ let server = http.createServer((req, res) => {
         }
         if (req.url == "/api/register" && req.method == "POST") {
             return registerUser(req, res)
+        }
+        if (req.url == "/login" && req.method == "GET") {
+            return res.end(loginHtml);
+        }
+        if (req.url == "/api/login" && req.method == "POST") {
+            return loginUser(req, res)
         }
         res.writeHead(404, "Not found");
         return res.end();
@@ -71,15 +77,56 @@ io.on("connection", (socket) => {
     });
 });
 
-function registerUser(req,res){
+function registerUser(req, res) {
     let data = ""
-    req.on("data", function(chunk){
+    req.on("data", function (chunk) {
         data += chunk
     })
-    req.on("end", function(){
-        data = JSON.parse(data)
-        console.log(data)
+    req.on("end", async function () {
+        try {
+            data = JSON.parse(data)
+            if(!data.login || !data.password){
+                res.end("login or password is empty")
+                return
+            }
+            if(!await isExistUser(data.login)){
+                res.end("User is already exist")
+                return
+            }
+            await addUser(data.login, data.password)
+            res.end("Register success!")
+        } catch (err) {
+            console.log(err)
+            res.end("Error: "+ err)
+        }
     })
     res.end()
+
 }
 
+
+function loginUser(req, res) {
+    let data = ""
+    req.on("data", function (chunk) {
+        data += chunk
+    })
+    req.on("end", async function () {
+        try {
+            data = JSON.parse(data)
+            if(!data.login || !data.password){
+                res.end("login or password is empty")
+                return
+            }
+            let token = await getAuthToken(data)
+            validTokens.push(token)
+            res.writeHead(200)
+            res.end(token)
+        } catch (err) {
+            console.log(err)
+            res.writeHead(500)
+            res.end("Error: "+ err)
+        }
+    })
+    res.end()
+
+}
