@@ -36,7 +36,7 @@ document?.querySelector(".register")?.addEventListener("submit", function(event)
         password: password.value
     }
     let xhr = new XMLHttpRequest()
-    xhr.open("POST", "/api/register")
+    xhr.open("POST", "/api/login")
     xhr.onload = ()=>{
       alertify.success("We are stupid bitch")
     }

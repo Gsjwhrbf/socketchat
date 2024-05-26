@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { Server } from "socket.io";
 import { getMessages, addMessage, isExistUser, addUser, getAuthToken } from "./database.js";
+import cookie from "cookie";
 
 const validTokens = [];
 
@@ -25,12 +26,12 @@ let loginHtml = fs.readFileSync(pathToLoginHtml);
 
 let server = http.createServer((req, res) => {
     try {
-        if (req.url == "/" && req.method == "GET") {
-            return res.end(indexHtmlFile);
-        }
-        if (req.url == "/script.js" && req.method == "GET") {
-            return res.end(scriptFile);
-        }
+        // if (req.url == "/" && req.method == "GET") {
+        //     return res.end(indexHtmlFile);
+        // }
+        // if (req.url == "/script.js" && req.method == "GET") {
+        //     return res.end(scriptFile);
+        // }
         if (req.url == "/style.css" && req.method == "GET") {
             return res.end(styleFile);
         }
@@ -52,8 +53,7 @@ let server = http.createServer((req, res) => {
         if (req.url == "/api/login" && req.method == "POST") {
             return loginUser(req, res)
         }
-        res.writeHead(404, "Not found");
-        return res.end();
+        guarded(req, res)
     } catch (error) {
         console.error(error.message);
         res.writeHead(500, "Server error");
@@ -127,6 +127,33 @@ function loginUser(req, res) {
             res.end("Error: "+ err)
         }
     })
-    res.end()
+}
 
+function getCredentials(req) {
+    let cookies = cookie.parse(req.headers?.cookie || "")
+    let token = cookies?.token
+    if(!token || !validTokens.includes(token)) return null
+    let [user_id, login] = token.split(".")
+    if(!user_id || !login) return null
+    return {user_id, login}
+    }
+
+function guarded(req, res){
+    const credentials = getCredentials(req)
+    try{
+       if(!credentials){
+           res.writeHead(301, {location: "/register"})
+           res.end()
+       }else if(req.method == "GET"){
+          switch(req.url){
+              case "/":
+                return res.end(indexHtmlFile)
+              case "script.js":
+                return res.end(scriptFile)
+          }
+       }
+    }catch(err){
+       res.writeHead(404)
+       res.end(err)
+    }
 }
